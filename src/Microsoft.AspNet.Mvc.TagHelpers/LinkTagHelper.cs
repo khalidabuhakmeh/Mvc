@@ -229,15 +229,19 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
             var builder = new DefaultTagHelperContent();
 
-            if (mode == Mode.Fallback && string.IsNullOrEmpty(HrefInclude) || mode == Mode.AppendVersion)
+            if (!string.IsNullOrEmpty(Href))
             {
-                // No globbing to do, just build a <link /> tag to match the original one in the source file.
-                // Or just add file version to the link tag.
-                BuildLinkTag(attributes, builder);
+                output.Attributes[HrefAttributeName].Value = AppendFileVersionIfApplicable(Href);
             }
-            else
+
+            if (mode == Mode.GlobbedHref || mode == Mode.Fallback && !string.IsNullOrEmpty(HrefInclude))
             {
                 BuildGlobbedLinkTags(attributes, builder);
+                if (string.IsNullOrEmpty(Href))
+                {
+                    output.TagName = null;
+                    output.Content.SetContent(string.Empty);
+                }
             }
 
             if (mode == Mode.Fallback)
@@ -245,21 +249,25 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 BuildFallbackBlock(builder);
             }
 
-            // We've taken over tag rendering, so prevent rendering the outer tag
-            output.TagName = null;
-            output.Content.SetContent(builder);
+            output.PostElement.SetContent(builder);
         }
 
         private void BuildGlobbedLinkTags(TagHelperAttributeList attributes, TagHelperContent builder)
         {
             EnsureGlobbingUrlBuilder();
 
-            // Build a <link /> tag for each matched href as well as the original one in the source file
-            var urls = GlobbingUrlBuilder.BuildUrlList(Href, HrefInclude, HrefExclude);
+            // Build a <link /> tag for each matched href.
+            var urls = GlobbingUrlBuilder.BuildUrlList(null, HrefInclude, HrefExclude);
             foreach (var url in urls)
             {
                 // "url" values come from bound attributes and globbing. Must always be non-null.
                 Debug.Assert(url != null);
+
+                if (string.Equals(Href, url, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Don't build script tag for the original source url.
+                    continue;
+                }
 
                 attributes[HrefAttributeName] = url;
                 BuildLinkTag(attributes, builder);
@@ -269,6 +277,8 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
         private void BuildFallbackBlock(TagHelperContent builder)
         {
             EnsureGlobbingUrlBuilder();
+            EnsureFileVersionProvider();
+
             var fallbackHrefs =
                 GlobbingUrlBuilder.BuildUrlList(FallbackHref, FallbackHrefInclude, FallbackHrefExclude).ToArray();
 
@@ -332,7 +342,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
         private void BuildLinkTag(TagHelperAttributeList attributes, TagHelperContent builder)
         {
-            EnsureFileVersionProvider();
             builder.Append("<link ");
 
             foreach (var attribute in attributes)
@@ -344,11 +353,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                     // "href" values come from bound attributes and globbing. So anything but a non-null string is
                     // unexpected but could happen if another helper targeting the same element does something odd.
                     // Pass through existing value in that case.
-                    var attributeStringValue = attributeValue as string;
-                    if (attributeStringValue != null)
-                    {
-                        attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
-                    }
+                    attributeValue = AppendFileVersionIfApplicable(attributeValue);
                 }
 
                 builder
@@ -359,6 +364,21 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             }
 
             builder.Append("/>");
+        }
+
+        private object AppendFileVersionIfApplicable(object attributeValue)
+        {
+            if (AppendVersion == true)
+            {
+                EnsureFileVersionProvider();
+                var attributeStringValue = attributeValue as string;
+                if (attributeStringValue != null)
+                {
+                    attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
+                }
+            }
+
+            return attributeValue;
         }
 
         private enum Mode
