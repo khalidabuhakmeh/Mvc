@@ -190,19 +190,25 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 return;
             }
 
-            // Get the highest matched mode
-            var mode = modeResult.FullMatches.Select(match => match.Mode).Max();
-
             // NOTE: Values in TagHelperOutput.Attributes may already be HTML-encoded.
             var attributes = new TagHelperAttributeList(output.Attributes);
 
-            var builder = new DefaultTagHelperContent();
-
-            if (!string.IsNullOrEmpty(Src) && AppendVersion == true)
+            if (AppendVersion == true)
             {
                 EnsureFileVersionProvider();
-                output.Attributes[SrcAttributeName].Value = _fileVersionProvider.AddFileVersionToPath(Src);
+
+                var attributeStringValue = output.Attributes[SrcAttributeName]?.Value as string;
+                if (attributeStringValue != null)
+                {
+                    output.Attributes[SrcAttributeName].Value =
+                        _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
+                }
             }
+
+            var builder = new DefaultTagHelperContent();
+
+            // Get the highest matched mode
+            var mode = modeResult.FullMatches.Select(match => match.Mode).Max();
 
             if (mode == Mode.GlobbedSrc || mode == Mode.Fallback && !string.IsNullOrEmpty(SrcInclude))
             {
@@ -290,7 +296,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                             var attributeValue = src;
                             if (AppendVersion == true)
                             {
-                                EnsureFileVersionProvider();
                                 attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeValue);
                             }
 
@@ -342,8 +347,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 if (AppendVersion == true &&
                     string.Equals(attribute.Name, SrcAttributeName, StringComparison.OrdinalIgnoreCase))
                 {
-                    EnsureFileVersionProvider();
-
                     // "src" values come from bound attributes and globbing. So anything but a non-null string is
                     // unexpected but could happen if another helper targeting the same element does something odd.
                     // Pass through existing value in that case.

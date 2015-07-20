@@ -221,19 +221,25 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 return;
             }
 
-            // Get the highest matched mode
-            var mode = modeResult.FullMatches.Select(match => match.Mode).Max();
-
             // NOTE: Values in TagHelperOutput.Attributes may already be HTML-encoded.
             var attributes = new TagHelperAttributeList(output.Attributes);
 
-            var builder = new DefaultTagHelperContent();
-
-            if (!string.IsNullOrEmpty(Href) && AppendVersion == true)
+            if (AppendVersion == true)
             {
                 EnsureFileVersionProvider();
-                output.Attributes[HrefAttributeName].Value = _fileVersionProvider.AddFileVersionToPath(Href);
+
+                var attributeStringValue = output.Attributes[HrefAttributeName]?.Value as string;
+                if (attributeStringValue != null)
+                {
+                    output.Attributes[HrefAttributeName].Value =
+                        _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
+                }
             }
+
+            var builder = new DefaultTagHelperContent();
+
+            // Get the highest matched mode
+            var mode = modeResult.FullMatches.Select(match => match.Mode).Max();
 
             if (mode == Mode.GlobbedHref || mode == Mode.Fallback && !string.IsNullOrEmpty(HrefInclude))
             {
@@ -286,7 +292,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 if (AppendVersion == true)
                 {
-                    EnsureFileVersionProvider();
                     for (var i=0; i < fallbackHrefs.Length; i++)
                     {
                         // fallbackHrefs come from bound attributes and globbing. Must always be non-null.
@@ -351,8 +356,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 if (AppendVersion == true &&
                     string.Equals(attribute.Name, HrefAttributeName, StringComparison.OrdinalIgnoreCase))
                 {
-                    EnsureFileVersionProvider();
-
                     // "href" values come from bound attributes and globbing. So anything but a non-null string is
                     // unexpected but could happen if another helper targeting the same element does something odd.
                     // Pass through existing value in that case.

@@ -239,6 +239,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             helper.Process(context, output);
 
             // Assert
+            Assert.NotNull(output.TagName);
             Assert.False(output.IsContentModified);
             Assert.True(output.PostElement.IsModified);
         }
@@ -333,6 +334,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             helper.Process(context, output);
 
             // Assert
+            Assert.Null(output.TagName);
             Assert.True(output.IsContentModified);
             Assert.True(output.PostElement.IsModified);
         }
@@ -486,6 +488,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             helper.Process(context, output);
 
             // Assert
+            Assert.NotNull(output.TagName);
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
             Assert.True(output.PostElement.IsEmpty);
