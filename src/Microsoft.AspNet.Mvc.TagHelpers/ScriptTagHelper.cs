@@ -198,9 +198,10 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
             var builder = new DefaultTagHelperContent();
 
-            if (!string.IsNullOrEmpty(Src))
+            if (!string.IsNullOrEmpty(Src) && AppendVersion == true)
             {
-                output.Attributes[SrcAttributeName].Value = AppendFileVersionIfApplicable(Src);
+                EnsureFileVersionProvider();
+                output.Attributes[SrcAttributeName].Value = _fileVersionProvider.AddFileVersionToPath(Src);
             }
 
             if (mode == Mode.GlobbedSrc || mode == Mode.Fallback && !string.IsNullOrEmpty(SrcInclude))
@@ -208,6 +209,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 BuildGlobbedScriptTags(attributes, builder);
                 if (string.IsNullOrEmpty(Src))
                 {
+                    // Only SrcInclude is specified. Don't render the original tag.
                     output.TagName = null;
                     output.Content.SetContent(string.Empty);
                 }
@@ -234,9 +236,9 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 // "url" values come from bound attributes and globbing. Must always be non-null.
                 Debug.Assert(url != null);
 
-                if (string.Equals(Src, url, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(url, Src, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Don't build script tag for the original source url.
+                    // Don't build duplicate script tag for the original source url.
                     continue;
                 }
 
@@ -248,7 +250,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
         private void BuildFallbackBlock(TagHelperAttributeList attributes, DefaultTagHelperContent builder)
         {
             EnsureGlobbingUrlBuilder();
-            EnsureFileVersionProvider();
 
             var fallbackSrcs = GlobbingUrlBuilder.BuildUrlList(FallbackSrc, FallbackSrcInclude, FallbackSrcExclude);
             if (fallbackSrcs.Any())
@@ -289,6 +290,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                             var attributeValue = src;
                             if (AppendVersion == true)
                             {
+                                EnsureFileVersionProvider();
                                 attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeValue);
                             }
 
@@ -304,44 +306,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
                 builder.Append("\"));</script>");
             }
-        }
-
-        private void BuildScriptTag(
-            TagHelperAttributeList attributes,
-            TagHelperContent builder)
-        {
-            builder.Append("<script");
-
-            foreach (var attribute in attributes)
-            {
-                var attributeValue = attribute.Value;
-                if (string.Equals(attribute.Name, SrcAttributeName, StringComparison.OrdinalIgnoreCase))
-                {
-                    // "src" values come from bound attributes and globbing. So anything but a non-null string is
-                    // unexpected but could happen if another helper targeting the same element does something odd.
-                    // Pass through existing value in that case.
-                    attributeValue = AppendFileVersionIfApplicable(attributeValue);
-                }
-
-                AppendAttribute(builder, attribute.Name, attributeValue, escapeQuotes: false);
-            }
-
-            builder.Append("></script>");
-        }
-
-        private object AppendFileVersionIfApplicable(object attributeValue)
-        {
-            if (AppendVersion == true)
-            {
-                EnsureFileVersionProvider();
-                var attributeStringValue = attributeValue as string;
-                if (attributeStringValue != null)
-                {
-                    attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
-                }
-            }
-
-            return attributeValue;
         }
 
         private void EnsureGlobbingUrlBuilder()
@@ -364,6 +328,36 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                     Cache,
                     ViewContext.HttpContext.Request.PathBase);
             }
+        }
+
+        private void BuildScriptTag(
+            TagHelperAttributeList attributes,
+            TagHelperContent builder)
+        {
+            builder.Append("<script");
+
+            foreach (var attribute in attributes)
+            {
+                var attributeValue = attribute.Value;
+                if (AppendVersion == true &&
+                    string.Equals(attribute.Name, SrcAttributeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    EnsureFileVersionProvider();
+
+                    // "src" values come from bound attributes and globbing. So anything but a non-null string is
+                    // unexpected but could happen if another helper targeting the same element does something odd.
+                    // Pass through existing value in that case.
+                    var attributeStringValue = attributeValue as string;
+                    if (attributeStringValue != null)
+                    {
+                        attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
+                    }
+                }
+
+                AppendAttribute(builder, attribute.Name, attributeValue, escapeQuotes: false);
+            }
+
+            builder.Append("></script>");
         }
 
         private void AppendAttribute(TagHelperContent content, string key, object value, bool escapeQuotes)

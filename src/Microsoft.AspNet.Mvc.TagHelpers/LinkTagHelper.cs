@@ -229,9 +229,10 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
             var builder = new DefaultTagHelperContent();
 
-            if (!string.IsNullOrEmpty(Href))
+            if (!string.IsNullOrEmpty(Href) && AppendVersion == true)
             {
-                output.Attributes[HrefAttributeName].Value = AppendFileVersionIfApplicable(Href);
+                EnsureFileVersionProvider();
+                output.Attributes[HrefAttributeName].Value = _fileVersionProvider.AddFileVersionToPath(Href);
             }
 
             if (mode == Mode.GlobbedHref || mode == Mode.Fallback && !string.IsNullOrEmpty(HrefInclude))
@@ -239,6 +240,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 BuildGlobbedLinkTags(attributes, builder);
                 if (string.IsNullOrEmpty(Href))
                 {
+                    // Only HrefInclude is specified. Don't render the original tag.
                     output.TagName = null;
                     output.Content.SetContent(string.Empty);
                 }
@@ -265,7 +267,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
 
                 if (string.Equals(Href, url, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Don't build script tag for the original source url.
+                    // Don't build duplicate link tag for the original href url.
                     continue;
                 }
 
@@ -277,8 +279,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
         private void BuildFallbackBlock(TagHelperContent builder)
         {
             EnsureGlobbingUrlBuilder();
-            EnsureFileVersionProvider();
-
             var fallbackHrefs =
                 GlobbingUrlBuilder.BuildUrlList(FallbackHref, FallbackHrefInclude, FallbackHrefExclude).ToArray();
 
@@ -286,6 +286,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 if (AppendVersion == true)
                 {
+                    EnsureFileVersionProvider();
                     for (var i=0; i < fallbackHrefs.Length; i++)
                     {
                         // fallbackHrefs come from bound attributes and globbing. Must always be non-null.
@@ -350,10 +351,16 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 if (AppendVersion == true &&
                     string.Equals(attribute.Name, HrefAttributeName, StringComparison.OrdinalIgnoreCase))
                 {
+                    EnsureFileVersionProvider();
+
                     // "href" values come from bound attributes and globbing. So anything but a non-null string is
                     // unexpected but could happen if another helper targeting the same element does something odd.
                     // Pass through existing value in that case.
-                    attributeValue = AppendFileVersionIfApplicable(attributeValue);
+                    var attributeStringValue = attributeValue as string;
+                    if (attributeStringValue != null)
+                    {
+                        attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
+                    }
                 }
 
                 builder
@@ -364,21 +371,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             }
 
             builder.Append("/>");
-        }
-
-        private object AppendFileVersionIfApplicable(object attributeValue)
-        {
-            if (AppendVersion == true)
-            {
-                EnsureFileVersionProvider();
-                var attributeStringValue = attributeValue as string;
-                if (attributeStringValue != null)
-                {
-                    attributeValue = _fileVersionProvider.AddFileVersionToPath(attributeStringValue);
-                }
-            }
-
-            return attributeValue;
         }
 
         private enum Mode

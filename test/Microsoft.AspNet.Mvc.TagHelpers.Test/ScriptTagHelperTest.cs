@@ -66,7 +66,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 FallbackTestExpression = "http://www.example.com/blank.js",
                 Src = "/blank.js",
             };
-            var expectedAttributes = output.Attributes;
+            var expectedAttributes = new TagHelperAttributeList(output.Attributes);
             expectedAttributes.Add(new TagHelperAttribute("src", "/blank.js"));
 
             // Act
@@ -82,28 +82,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 return new TheoryData<TagHelperAttributeList, Action<ScriptTagHelper>>
                 {
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-src-include"] = "*.js"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.SrcInclude = "*.js";
-                        }
-                    },
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-src-include"] = "*.js",
-                            ["asp-src-exclude"] = "*.min.js"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.SrcInclude = "*.js";
-                            tagHelper.SrcExclude = "*.min.js";
-                        }
-                    },
                     {
                         new TagHelperAttributeList
                         {
@@ -157,32 +135,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                         }
                     },
                     // File Version
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-src-include"] = "*.js",
-                            ["asp-append-version"] = "true"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.SrcInclude = "*.js";
-                            tagHelper.AppendVersion = true;
-                        }
-                    },
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-src-include"] = "*.js",
-                            ["asp-src-exclude"] = "*.min.js",
-                            ["asp-append-version"] = "true"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.SrcInclude = "*.js";
-                            tagHelper.SrcExclude = "*.min.js";
-                            tagHelper.AppendVersion = true;
-                        }
-                    },
                     {
                         new TagHelperAttributeList
                         {
@@ -279,7 +231,103 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             await helper.ProcessAsync(context, output);
 
             // Assert
-            Assert.True(output.IsContentModified || !string.IsNullOrEmpty(output.PostElement.GetContent()));
+            Assert.False(output.IsContentModified);
+            Assert.True(output.PostElement.IsModified);
+            Assert.Empty(logger.Logged);
+        }
+
+        public static TheoryData RunsWhenRequiredAttributesArePresent_NoSrc_Data
+        {
+            get
+            {
+                return new TheoryData<TagHelperAttributeList, Action<ScriptTagHelper>>
+                {
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-src-include"] = "*.js"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.SrcInclude = "*.js";
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-src-include"] = "*.js",
+                            ["asp-src-exclude"] = "*.min.js"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.SrcInclude = "*.js";
+                            tagHelper.SrcExclude = "*.min.js";
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-src-include"] = "*.js",
+                            ["asp-append-version"] = "true"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.SrcInclude = "*.js";
+                            tagHelper.AppendVersion = true;
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-src-include"] = "*.js",
+                            ["asp-src-exclude"] = "*.min.js",
+                            ["asp-append-version"] = "true"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.SrcInclude = "*.js";
+                            tagHelper.SrcExclude = "*.min.js";
+                            tagHelper.AppendVersion = true;
+                        }
+                    }
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(RunsWhenRequiredAttributesArePresent_NoSrc_Data))]
+        public async Task RunsWhenRequiredAttributesArePresent_NoSrc(
+            TagHelperAttributeList attributes,
+            Action<ScriptTagHelper> setProperties)
+        {
+            // Arrange
+            var context = MakeTagHelperContext(attributes);
+            var output = MakeTagHelperOutput("script");
+            var logger = CreateLogger();
+            var hostingEnvironment = MakeHostingEnvironment();
+            var viewContext = MakeViewContext();
+            var globbingUrlBuilder = new Mock<GlobbingUrlBuilder>();
+            globbingUrlBuilder.Setup(g => g.BuildUrlList(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(new[] { "/common.js" });
+
+            var helper = new ScriptTagHelper(
+                CreateLogger(),
+                hostingEnvironment,
+                MakeCache(),
+                new CommonTestEncoder(),
+                new CommonTestEncoder())
+            {
+                ViewContext = viewContext,
+                GlobbingUrlBuilder = globbingUrlBuilder.Object
+            };
+            setProperties(helper);
+
+            // Act
+            await helper.ProcessAsync(context, output);
+
+            // Assert
+            Assert.True(output.IsContentModified);
+            Assert.True(output.PostElement.IsModified);
             Assert.Empty(logger.Logged);
         }
 
@@ -373,7 +421,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             // Assert
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
-            Assert.Empty(output.PostElement.GetContent());
+            Assert.True(output.PostElement.IsEmpty);
         }
 
         [Theory]
@@ -406,7 +454,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             // Assert
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
-            Assert.Empty(output.PostElement.GetContent());
+            Assert.True(output.PostElement.IsEmpty);
 
             Assert.Equal(2, logger.Logged.Count);
 
@@ -447,7 +495,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             // Assert
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
-            Assert.Empty(output.PostElement.GetContent());
+            Assert.True(output.PostElement.IsEmpty);
         }
 
         [Fact]
@@ -485,8 +533,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
         }
 
         [Fact]
-        // Does not work as expected - https://github.com/aspnet/Mvc/issues/2639
-        public async Task PreservesOrderOfSourceAttributesWhenRun()
+        public async Task PreservesOrderOfNonSrcAttributes()
         {
             // Arrange
             var tagHelperContext = MakeTagHelperContext(

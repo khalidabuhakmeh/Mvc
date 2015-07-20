@@ -118,7 +118,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                 FallbackTestValue = "hidden",
                 Href = "test.css",
             };
-            var expectedAttributes = output.Attributes;
+            var expectedAttributes = new TagHelperAttributeList(output.Attributes);
             expectedAttributes.Add(new TagHelperAttribute("href", "test.css"));
 
             // Act
@@ -134,28 +134,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 return new TheoryData<TagHelperAttributeList, Action<LinkTagHelper>>
                 {
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-href-include"] = "*.css"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.HrefInclude = "*.css";
-                        }
-                    },
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-href-include"] = "*.css",
-                            ["asp-href-exclude"] = "*.min.css"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.HrefInclude = "*.css";
-                            tagHelper.HrefExclude = "*.min.css";
-                        }
-                    },
                     {
                         new TagHelperAttributeList
                         {
@@ -189,32 +167,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
                         }
                     },
                     // File Version
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-href-include"] = "*.css",
-                            ["asp-append-version"] = "true"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.HrefInclude = "*.css";
-                            tagHelper.AppendVersion = true;
-                        }
-                    },
-                    {
-                        new TagHelperAttributeList
-                        {
-                            ["asp-href-include"] = "*.css",
-                            ["asp-href-exclude"] = "*.min.css",
-                            ["asp-append-version"] = "true"
-                        },
-                        tagHelper =>
-                        {
-                            tagHelper.HrefInclude = "*.css";
-                            tagHelper.HrefExclude = "*.min.css";
-                            tagHelper.AppendVersion = true;
-                        }
-                    },
                     {
                         new TagHelperAttributeList
                         {
@@ -287,12 +239,106 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             helper.Process(context, output);
 
             // Assert
-            Assert.True(output.IsContentModified || !string.IsNullOrEmpty(output.PostElement.GetContent()));
+            Assert.False(output.IsContentModified);
+            Assert.True(output.PostElement.IsModified);
+        }
+
+        public static TheoryData RunsWhenRequiredAttributesArePresent_NoHref_Data
+        {
+            get
+            {
+                return new TheoryData<TagHelperAttributeList, Action<LinkTagHelper>>
+                {
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-href-include"] = "*.css"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.HrefInclude = "*.css";
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-href-include"] = "*.css",
+                            ["asp-href-exclude"] = "*.min.css"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.HrefInclude = "*.css";
+                            tagHelper.HrefExclude = "*.min.css";
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-href-include"] = "*.css",
+                            ["asp-append-version"] = "true"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.HrefInclude = "*.css";
+                            tagHelper.AppendVersion = true;
+                        }
+                    },
+                    {
+                        new TagHelperAttributeList
+                        {
+                            ["asp-href-include"] = "*.css",
+                            ["asp-href-exclude"] = "*.min.css",
+                            ["asp-append-version"] = "true"
+                        },
+                        tagHelper =>
+                        {
+                            tagHelper.HrefInclude = "*.css";
+                            tagHelper.HrefExclude = "*.min.css";
+                            tagHelper.AppendVersion = true;
+                        }
+                    }
+                };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(RunsWhenRequiredAttributesArePresent_NoHref_Data))]
+        public void RunsWhenRequiredAttributesArePresent_NoHref(
+            TagHelperAttributeList attributes,
+            Action<LinkTagHelper> setProperties)
+        {
+            // Arrange
+            var context = MakeTagHelperContext(attributes);
+            var output = MakeTagHelperOutput("link");
+            var logger = new Mock<ILogger<LinkTagHelper>>();
+            var hostingEnvironment = MakeHostingEnvironment();
+            var viewContext = MakeViewContext();
+            var globbingUrlBuilder = new Mock<GlobbingUrlBuilder>();
+            globbingUrlBuilder.Setup(g => g.BuildUrlList(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(new[] { "/common.css" });
+
+            var helper = new LinkTagHelper(
+                logger.Object,
+                hostingEnvironment,
+                MakeCache(),
+                new CommonTestEncoder(),
+                new CommonTestEncoder())
+            {
+                ViewContext = viewContext,
+                GlobbingUrlBuilder = globbingUrlBuilder.Object
+            };
+            setProperties(helper);
+
+            // Act
+            helper.Process(context, output);
+
+            // Assert
+            Assert.True(output.IsContentModified);
+            Assert.True(output.PostElement.IsModified);
         }
 
         [Fact]
-        // Does not work as expected - https://github.com/aspnet/Mvc/issues/2639
-        public void PreservesOrderOfSourceAttributesWhenRun()
+        public void PreservesOrderOfNonHrefAttributes()
         {
             // Arrange
             var context = MakeTagHelperContext(
@@ -442,7 +488,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             // Assert
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
-            Assert.Empty(output.PostElement.GetContent());
+            Assert.True(output.PostElement.IsEmpty);
         }
 
         [Fact]
@@ -471,7 +517,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             // Assert
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
-            Assert.Empty(output.PostElement.GetContent());
+            Assert.True(output.PostElement.IsEmpty);
         }
 
         [Fact]
