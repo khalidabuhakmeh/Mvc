@@ -642,7 +642,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 ViewContext = viewContext,
                 Href = "/css/site.css",
-                HrefInclude = "**/*.css",
                 AppendVersion = true
             };
 
@@ -684,7 +683,6 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             {
                 ViewContext = viewContext,
                 Href = "/bar/css/site.css",
-                HrefInclude = "**/*.css",
                 AppendVersion = true
             };
 
