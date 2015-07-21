@@ -518,6 +518,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             helper.Process(context, output);
 
             // Assert
+            Assert.NotNull(output.TagName);
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
             Assert.True(output.PostElement.IsEmpty);

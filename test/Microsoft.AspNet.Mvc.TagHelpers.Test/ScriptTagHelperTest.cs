@@ -455,6 +455,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             await helper.ProcessAsync(tagHelperContext, output);
 
             // Assert
+            Assert.Equal("script", output.TagName);
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
             Assert.True(output.PostElement.IsEmpty);
@@ -496,6 +497,7 @@ namespace Microsoft.AspNet.Mvc.TagHelpers
             await helper.ProcessAsync(tagHelperContext, output);
 
             // Assert
+            Assert.Equal("script", output.TagName);
             Assert.False(output.IsContentModified);
             Assert.Empty(output.Attributes);
             Assert.True(output.PostElement.IsEmpty);
