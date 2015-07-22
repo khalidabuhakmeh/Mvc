@@ -16,9 +16,13 @@
     "dnx451": {},
     "dnxcore50": {}
   },
-  "exclude": [
-    "wwwroot",
-    "node_modules",
-    "bower_components"
-  ]
+    "exclude": [
+        "wwwroot",
+        "node_modules",
+        "bower_components"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/aspnet/mvc"
+    }
 }
